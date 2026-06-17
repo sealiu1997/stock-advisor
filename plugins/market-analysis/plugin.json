@@ -1,0 +1,17 @@
+{
+  "name": "market-analysis",
+  "description": "市场分析工具集：大盘综述、个股估值、财报分析、经济事件日历。",
+  "version": "1.0.0",
+  "author": {
+    "name": "liuhaiyang"
+  },
+  "keywords": [
+    "market",
+    "valuation",
+    "earnings",
+    "macro",
+    "economic-calendar",
+    "fomc",
+    "cpi"
+  ]
+}

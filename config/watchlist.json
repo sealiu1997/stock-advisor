@@ -1,0 +1,73 @@
+{
+  "HK": [
+    {"symbol": "00700", "name": "腾讯控股"},
+    {"symbol": "03690", "name": "美团-W"},
+    {"symbol": "01810", "name": "小米集团-W"},
+    {"symbol": "01211", "name": "比亚迪股份"},
+    {"symbol": "09992", "name": "泡泡玛特"},
+    {"symbol": "06693", "name": "赤峰黄金"},
+    {"symbol": "00883", "name": "中国海洋石油"},
+    {"symbol": "02899", "name": "紫金矿业"},
+    {"symbol": "03896", "name": "金山云"},
+    {"symbol": "02513", "name": "北京智谱"},
+    {"symbol": "00100", "name": "上海稀宇"},
+    {"symbol": "01378", "name": "中国宏桥"},
+    {"symbol": "03441", "name": "CSOP FTSE"}
+  ],
+  "US": [
+    {"symbol": "AAPL", "name": "苹果"},
+    {"symbol": "AMD", "name": "AMD"},
+    {"symbol": "BABA", "name": "阿里巴巴"},
+    {"symbol": "GOOG", "name": "谷歌"},
+    {"symbol": "NVDA", "name": "英伟达"},
+    {"symbol": "TSLA", "name": "特斯拉"},
+    {"symbol": "VOO", "name": "先锋标普500"},
+    {"symbol": "MGK", "name": "领航超大盘"},
+    {"symbol": "TQQQ", "name": "三倍做多纳指"},
+    {"symbol": "YINN", "name": "三倍做多富时中国"},
+    {"symbol": "YANG", "name": "三倍做空富时中国"},
+    {"symbol": "MSTR", "name": "微策投资"},
+    {"symbol": "ORCL", "name": "甲骨文"},
+    {"symbol": "BRK-B", "name": "伯克希尔B"},
+    {"symbol": "COIN", "name": "Coinbase"},
+    {"symbol": "PDD", "name": "拼多多"},
+    {"symbol": "COPX", "name": "铜矿ETF"},
+    {"symbol": "MSFT", "name": "微软"},
+    {"symbol": "IBKR", "name": "盈透证券"},
+    {"symbol": "LYSDY", "name": "莱纳斯(OTC)"},
+    {"symbol": "CRCL", "name": "Circle"},
+    {"symbol": "ET", "name": "Energy Transfer"},
+    {"symbol": "DXJ", "name": "WisdomTree日本"}
+  ],
+  "FX_COMM": [
+    {"symbol": "EURUSD=X", "name": "欧元/美元"},
+    {"symbol": "GBPUSD=X", "name": "英镑/美元"},
+    {"symbol": "JPY=X", "name": "美元/日元"},
+    {"symbol": "CL=F", "name": "原油期货"},
+    {"symbol": "GC=F", "name": "黄金期货"},
+    {"symbol": "GLD", "name": "黄金ETF"}
+  ],
+  "CRYPTO": [
+    {"symbol": "BTCUSDT", "name": "比特币"},
+    {"symbol": "PAXGUSDT", "name": "黄金代币"},
+    {"symbol": "ETHUSDT", "name": "以太坊"},
+    {"symbol": "BNBUSDT", "name": "币安币"},
+    {"symbol": "SOLUSDT", "name": "Solana"},
+    {"symbol": "ZECUSDT", "name": "大零币"},
+    {"symbol": "HYPEUSDT", "name": "Hyperliquid"},
+    {"symbol": "APTUSDT", "name": "Aptos"},
+    {"symbol": "ASTERUSDT", "name": "Astar"},
+    {"symbol": "KAITOUSDT", "name": "Kaito"},
+    {"symbol": "ADAUSDT", "name": "艾达币"},
+    {"symbol": "XPLUSDT", "name": "XPLA"},
+    {"symbol": "UNIUSDT", "name": "Uniswap"},
+    {"symbol": "AAVEUSDT", "name": "Aave"}
+  ],
+  "CRYPTO_RATIOS": [
+    {"symbol": "ETHBTC", "name": "ETH/BTC (汇率)"},
+    {"symbol": "SOLETH", "name": "SOL/ETH (汇率)"},
+    {"symbol": "USDCUSDT", "name": "USDC/USDT (汇率)"},
+    {"symbol": "USDEUSDT", "name": "USDE/USDT (汇率)"},
+    {"symbol": "USD1USDT", "name": "USD1/USDT (汇率)"}
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "macro_events": [
+    {
+      "name": "CPI (美国消费者物价指数)",
+      "id": "us_cpi",
+      "importance": "high",
+      "alert_hours_before": 12,
+      "description": "衡量通胀水平的核心指标，直接影响美联储加息/降息决策"
+    },
+    {
+      "name": "Non-Farm Payrolls (非农就业)",
+      "id": "us_nfp",
+      "importance": "high",
+      "alert_hours_before": 12,
+      "description": "美国就业市场健康度的关键指标"
+    },
+    {
+      "name": "FOMC Rate Decision (美联储利率决议)",
+      "id": "fomc_rate",
+      "importance": "critical",
+      "alert_hours_before": 24,
+      "description": "直接决定利率走向，影响所有资产定价"
+    },
+    {
+      "name": "PCE Price Index (PCE物价指数)",
+      "id": "us_pce",
+      "importance": "high",
+      "alert_hours_before": 12,
+      "description": "美联储首选通胀指标，比CPI更受美联储关注"
+    },
+    {
+      "name": "GDP (国内生产总值)",
+      "id": "us_gdp",
+      "importance": "high",
+      "alert_hours_before": 12,
+      "description": "经济增长的综合衡量指标"
+    },
+    {
+      "name": "ISM Manufacturing PMI (制造业PMI)",
+      "id": "us_ism_mfg",
+      "importance": "medium",
+      "alert_hours_before": 6,
+      "description": "制造业景气度先行指标，50为荣枯线"
+    },
+    {
+      "name": "ISM Services PMI (服务业PMI)",
+      "id": "us_ism_svc",
+      "importance": "medium",
+      "alert_hours_before": 6,
+      "description": "服务业景气度，美国GDP的主要构成"
+    },
+    {
+      "name": "Initial Jobless Claims (初请失业金)",
+      "id": "us_jobless",
+      "importance": "medium",
+      "alert_hours_before": 6,
+      "description": "每周发布，劳动力市场的高频指标"
+    },
+    {
+      "name": "Retail Sales (零售销售)",
+      "id": "us_retail",
+      "importance": "medium",
+      "alert_hours_before": 6,
+      "description": "消费支出直接衡量，占GDP约70%"
+    }
+  ],
+  "earnings_alert_days_before": 2
+}

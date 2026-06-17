@@ -1,0 +1,18 @@
+{
+  "HK": [
+    {"symbol": "1810", "name": "小米集团", "holdings": 1000, "cost_price": null},
+    {"symbol": "3690", "name": "美团", "holdings": 400, "cost_price": null},
+    {"symbol": "0883", "name": "中国海洋石油", "holdings": 1000, "cost_price": null}
+  ],
+  "US": [
+    {"symbol": "COPX", "name": "铜矿ETF", "holdings": 5, "cost_price": null},
+    {"symbol": "GOOG", "name": "谷歌", "holdings": 10, "cost_price": null},
+    {"symbol": "IBKR", "name": "盈透证券", "holdings": 3.4503, "cost_price": null},
+    {"symbol": "LYSDY", "name": "莱纳斯", "holdings": 100, "cost_price": null},
+    {"symbol": "MSFT", "name": "微软", "holdings": 5, "cost_price": null}
+  ],
+  "CRYPTO": [
+    {"symbol": "UNIUSDT", "name": "Uniswap", "holdings": 0, "cost_price": null},
+    {"symbol": "AAVEUSDT", "name": "Aave", "holdings": 0, "cost_price": null}
+  ]
+}

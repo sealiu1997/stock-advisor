@@ -1,0 +1,15 @@
+{
+  "name": "news-sentiment",
+  "description": "财经新闻抓取与社交媒体情绪分析。通过 yfinance 和 OpenCLI 采集新闻，分析持仓相关消息面和社交情绪。",
+  "version": "1.0.0",
+  "author": {
+    "name": "liuhaiyang"
+  },
+  "keywords": [
+    "news",
+    "sentiment",
+    "social-media",
+    "reddit",
+    "twitter"
+  ]
+}
