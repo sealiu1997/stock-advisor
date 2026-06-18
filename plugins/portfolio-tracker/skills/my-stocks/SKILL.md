@@ -24,12 +24,7 @@ description: >
 !`python3 -c "import yfinance; print('YFINANCE_OK')" 2>/dev/null || echo "YFINANCE_MISSING"`
 ```
 
-如果 `YFINANCE_MISSING`，先安装：
-
-```python
-import subprocess, sys
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "yfinance"])
-```
+如果 `YFINANCE_MISSING`，提示用户先安装依赖：`pip install -r requirements.txt`，然后降级到仅使用腾讯财经 API（港股）和 Binance API（加密）等无需额外依赖的数据源。
 
 ### 判定播报模式
 
@@ -50,8 +45,8 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "yfinance"]
 
 读取以下两个配置文件：
 
-- `{baseDir}/../../config/portfolio.json` — 持仓数据
-- `{baseDir}/../../config/watchlist.json` — 关注列表
+- `config/portfolio.json` — 持仓数据（相对于项目根目录 `stock-advisor/`）
+- `config/watchlist.json` — 关注列表
 
 **portfolio.json 结构：**
 

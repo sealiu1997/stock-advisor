@@ -27,11 +27,7 @@ description: >
 !`python3 -c "import yfinance; print('READY')" 2>/dev/null || echo "YFINANCE_MISSING"`
 ```
 
-如果 `YFINANCE_MISSING`：
-```python
-import subprocess, sys
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "yfinance"])
-```
+如果 `YFINANCE_MISSING`：提示用户运行 `pip install -r requirements.txt`，本次无法执行此 skill。
 
 ---
 

@@ -77,7 +77,7 @@ opencli twitter profile {username} -f json
 
 ## Step 3: 写入 sources.json
 
-读取 `{baseDir}/../../config/sources.json`，向 `sources` 数组追加新条目：
+读取 `config/sources.json`（相对于项目根目录），向 `sources` 数组追加新条目：
 
 ### 条目结构
 
@@ -89,8 +89,10 @@ opencli twitter profile {username} -f json
   "label": "付鹏",
   "category": "macro",
   "url": "https://x.com/zaborxyz",
-  "opencli_cmd": "opencli twitter tweets zaborxyz --limit 10 -f json",
-  "fallback_cmd": null,
+  "fetch": {
+    "opencli": {"adapter": "twitter", "action": "tweets", "target": "zaborxyz"},
+    "fallback": null
+  },
   "added_at": "2026-06-18T15:30:00+08:00",
   "last_scanned": null,
   "enabled": true
@@ -107,26 +109,26 @@ opencli twitter profile {username} -f json
 | `label` | 是 | 显示名称 |
 | `category` | 是 | 内容分类 |
 | `url` | 是 | 原始 URL |
-| `opencli_cmd` | 是 | 主抓取命令（完整的 opencli 命令） |
-| `fallback_cmd` | 否 | 备用抓取命令（opencli 不可用时的替代） |
+| `fetch.opencli` | 是 | 结构化抓取参数：`adapter` (平台)、`action` (动作)、`target` (目标) |
+| `fetch.fallback` | 否 | 结构化备用参数，或 `null` |
 | `added_at` | 是 | ISO 8601 格式的添加时间 |
 | `last_scanned` | 否 | 上次扫描时间（由 source-feed 更新） |
 | `enabled` | 是 | 是否启用 |
 
-### 备用抓取路径 (fallback_cmd)
+### 备用抓取路径 (fetch.fallback)
 
-为每个平台设计备用方案，当 OpenCLI 不可用时使用：
+为每个平台设计结构化备用方案，当 OpenCLI 不可用时由白名单 dispatcher 构建命令：
 
-| 平台 | 备用方案 |
-|---|---|
-| twitter | `curl` + nitter 实例（如可用） |
-| reddit | Reddit JSON API: `curl 'https://www.reddit.com/r/{sub}/new.json?limit=10'` |
-| youtube | `yt-dlp --flat-playlist --print title,url` 或 YouTube RSS: `https://www.youtube.com/feeds/videos.xml?channel_id={id}` |
-| xueqiu | 雪球公开 API: `curl 'https://xueqiu.com/statuses/original/timeline.json?user_id={uid}'` |
-| substack | RSS: `https://{user}.substack.com/feed` |
-| medium | RSS: `https://medium.com/feed/@{user}` |
-| rss | `curl` 直接抓取 feed URL |
-| 其他 | 无备用，标注 `null` |
+| 平台 | fallback type | fallback url 示例 |
+|---|---|---|
+| twitter | `null` | 无（需登录） |
+| reddit | `"reddit_api"` | `https://www.reddit.com/r/{sub}/new.json?limit=10` |
+| youtube | `"youtube_rss"` | `https://www.youtube.com/feeds/videos.xml?channel_id={id}` |
+| xueqiu | `null` | 无 |
+| substack | `"rss"` | `https://{user}.substack.com/feed` |
+| medium | `"rss"` | `https://medium.com/feed/@{user}` |
+| rss | `"rss"` | 原始 feed URL |
+| 其他 | `null` | 无 |
 
 **写入 sources.json 时的检查：**
 1. 检查 `id` 是否已存在 → 已存在则提示用户，不重复添加

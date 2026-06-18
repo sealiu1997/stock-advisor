@@ -25,7 +25,7 @@ description: >
 - `OPENCLI_OK` → 主路径可用（OpenCLI + Browser Bridge）
 - `OPENCLI_MISSING` → 仅使用备用路径（RSS、公开 API）
 
-如果 OpenCLI 不可用，不阻塞执行，而是对每个源降级到 fallback_cmd。
+如果 OpenCLI 不可用，不阻塞执行，而是对每个源降级到 `fetch.fallback` 路径。
 
 ---
 
@@ -56,9 +56,9 @@ dedup_hours   = settings.get("dedup_window_hours", 72)
 对每个启用的源，按以下优先级执行抓取：
 
 ```
-1. opencli_cmd (主路径，需要 OpenCLI + Browser Bridge)
+1. fetch.opencli (主路径，需要 OpenCLI + Browser Bridge)
    ↓ 失败
-2. fallback_cmd (备用路径，RSS / 公开 API / curl)
+2. fetch.fallback (备用路径，RSS / 公开 API，由白名单 dispatcher 构建命令)
    ↓ 失败
 3. 标记为 "抓取失败"，跳过该源
 ```
@@ -85,38 +85,61 @@ esac
 ```python
 import subprocess, json
 
-def fetch_source(source, opencli_available=True):
+ALLOWED_COMMANDS = {"opencli", "curl"}
+
+def build_cmd(fetch_config, limit=10):
+    """从结构化 fetch 配置构建命令参数列表（白名单校验，禁止任意 shell 执行）"""
+    adapter = fetch_config["adapter"]
+    action = fetch_config["action"]
+    target = fetch_config["target"]
+    # 只允许字母数字、下划线、连字符、点和斜线
+    for val in [adapter, action, target]:
+        if not all(c.isalnum() or c in "-_./@ " for c in str(val)):
+            raise ValueError(f"Invalid character in fetch config: {val}")
+    return ["opencli", adapter, action, target, "--limit", str(limit), "-f", "json"]
+
+def build_fallback_cmd(fallback_config):
+    """从结构化 fallback 配置构建命令（仅允许白名单命令）"""
+    cmd_type = fallback_config.get("type")  # "rss", "reddit_api", "youtube_rss"
+    url = fallback_config.get("url", "")
+    if cmd_type == "rss":
+        return ["curl", "-s", "-L", "--max-time", "15", url]
+    elif cmd_type == "reddit_api":
+        return ["curl", "-s", "-H", "User-Agent: StockAdvisor/1.0", url]
+    elif cmd_type == "youtube_rss":
+        return ["curl", "-s", "-L", "--max-time", "15", url]
+    return None
+
+def fetch_source(source, opencli_available=True, limit=10):
     """抓取单个信息源"""
     result = {"source_id": source["id"], "items": [], "status": "ok", "method": "opencli"}
+    fetch = source.get("fetch", {})
     
-    # 主路径: OpenCLI
-    if opencli_available and source.get("opencli_cmd"):
+    # 主路径: OpenCLI（从结构化配置构建命令）
+    if opencli_available and fetch.get("opencli"):
         try:
-            proc = subprocess.run(
-                source["opencli_cmd"].split(),
-                capture_output=True, text=True, timeout=30
-            )
+            cmd = build_cmd(fetch["opencli"], limit)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if proc.returncode == 0 and proc.stdout.strip():
                 result["items"] = json.loads(proc.stdout)
                 return result
             elif proc.returncode == 66:
                 result["status"] = "empty"
                 return result
-        except (subprocess.TimeoutExpired, json.JSONDecodeError):
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError):
             pass
     
-    # 备用路径
-    if source.get("fallback_cmd"):
+    # 备用路径（从结构化配置构建，不使用 shell=True）
+    if fetch.get("fallback"):
         result["method"] = "fallback"
         try:
-            proc = subprocess.run(
-                source["fallback_cmd"], shell=True,
-                capture_output=True, text=True, timeout=30
-            )
-            if proc.returncode == 0 and proc.stdout.strip():
-                result["items"] = json.loads(proc.stdout)
-                return result
-        except:
+            cmd = build_fallback_cmd(fetch["fallback"])
+            if cmd and cmd[0] in ALLOWED_COMMANDS:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                if proc.returncode == 0 and proc.stdout.strip():
+                    result["items"] = json.loads(proc.stdout)
+                    return result
+        except (subprocess.TimeoutExpired, json.JSONDecodeError):
             pass
     
     result["status"] = "failed"

@@ -402,8 +402,10 @@ config/sources.json    ──→  source-manager (管理关注源)
       "label": "华尔街见闻",
       "category": "news",
       "url": "https://x.com/WallStreetCN",
-      "opencli_cmd": "opencli twitter timeline @WallStreetCN --limit {limit} -f json",
-      "fallback_cmd": null,
+      "fetch": {
+        "opencli": {"adapter": "twitter", "action": "timeline", "target": "@WallStreetCN"},
+        "fallback": null
+      },
       "added_at": "2026-06-18T00:00:00Z",
       "last_scanned": null,
       "enabled": true
@@ -419,7 +421,7 @@ config/sources.json    ──→  source-manager (管理关注源)
 
 **相比旧版改进：**
 - 所有平台统一为 `sources[]` 数组，而非按平台分组
-- 每个源携带 `opencli_cmd` (主路径) 和 `fallback_cmd` (降级路径)
+- 每个源携带结构化 `fetch` 配置（`opencli` 主路径 + `fallback` 降级路径），运行时由白名单 dispatcher 拼装命令，避免任意 shell 执行
 - `source-manager` skill 负责 URL → 标准化条目的自动转换
 - 支持 12+ 平台：Twitter, Reddit, YouTube, 微博, 小红书, 雪球, 知乎, B站, Substack, Medium, LinkedIn, RSS
 

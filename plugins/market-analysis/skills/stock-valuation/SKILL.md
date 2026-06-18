@@ -37,11 +37,7 @@ description: >
 !`python3 -c "import yfinance as yf; t=yf.Ticker('^TNX'); p=t.fast_info.last_price; print(f'RF_10Y={p/100:.4f}')" 2>/dev/null || echo "RF_FETCH_FAIL"`
 ```
 
-如果 `DEPS_MISSING`：
-```python
-import subprocess, sys
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "yfinance", "numpy", "pandas"])
-```
+如果 `DEPS_MISSING`：提示用户运行 `pip install -r requirements.txt`，本次无法执行此 skill。
 
 如果 `RF_FETCH_FAIL`：使用默认无风险利率 `rf = 0.045`，并在输出中标注。
 如果 `RF_10Y=` 打印出值：使用该值作为无风险利率。

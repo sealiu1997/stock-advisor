@@ -58,6 +58,10 @@ stock-advisor/
 
 ## 使用方式
 
+### 运行方式说明
+
+本项目遵循 [Agent Skills](https://github.com/anthropics/agent-skills) 开放标准。每个 SKILL.md 是 AI Agent 的执行指令文档 — **Agent 本身就是运行时**，读取 SKILL.md 后按步骤执行代码和分析。这不是传统的 Python CLI 工具，不需要 `python -m` 入口。
+
 ### Hermes / OpenClaw
 
 将 `stock-advisor/` 目录注册为 skill 目录，平台会自动发现所有 SKILL.md。通过 Routine/Schedule 功能设置定时播报。
@@ -90,7 +94,11 @@ stock-advisor/
 
 ## 依赖
 
-- **Python 3.9+** + `yfinance` — 行情与财务数据
+```bash
+pip install -r requirements.txt
+```
+
+- **Python 3.9+** + `yfinance` — 行情与财务数据（必需）
 - **[OpenCLI](https://github.com/jackwener/OpenCLI)**（可选）— 社交媒体和新闻采集，需配合 Chrome + Browser Bridge 插件
 
 ## 设计文档

@@ -23,12 +23,7 @@ description: >
 !`python3 -c "import yfinance, pandas; print('READY')" 2>/dev/null || echo "DEPS_MISSING"`
 ```
 
-如果 `DEPS_MISSING`：
-
-```python
-import subprocess, sys
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "yfinance", "pandas"])
-```
+如果 `DEPS_MISSING`：提示用户运行 `pip install -r requirements.txt`，本次无法执行此 skill。
 
 ---
 
@@ -55,7 +50,7 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "yfinance",
 
 ### A. 读取事件配置
 
-读取 `{baseDir}/../../config/events.json` 获取用户关注的宏观事件列表。
+读取 `config/events.json`（相对于项目根目录）获取用户关注的宏观事件列表。
 
 ### B. 查询 FOMC 日程
 
@@ -114,9 +109,10 @@ from datetime import datetime, timedelta
 
 ## Step 4: 查询持仓个股财报日
 
-读取 `{baseDir}/../../config/portfolio.json`，遍历所有持仓股票的财报日期：
+读取 `config/portfolio.json`，遍历所有持仓股票的财报日期：
 
 ```python
+import json
 import yfinance as yf
 from datetime import datetime, timedelta
 
@@ -129,22 +125,27 @@ upcoming_earnings = []
 for market in ["US", "HK"]:
     for stock in portfolio.get(market, []):
         symbol = stock["symbol"]
-        # 港股需要补 .HK 后缀
         yf_symbol = f"{symbol}.HK" if market == "HK" else symbol
         try:
             t = yf.Ticker(yf_symbol)
             cal = t.calendar
-            if cal is not None and not cal.empty:
-                # calendar 可能返回 DataFrame 或 dict
-                # 提取 Earnings Date
+            if cal is None:
+                continue
+            # calendar 返回 dict 或 DataFrame，统一处理
+            if isinstance(cal, dict):
                 earnings_date = cal.get("Earnings Date")
-                if earnings_date:
-                    upcoming_earnings.append({
-                        "symbol": symbol,
-                        "name": stock["name"],
-                        "date": earnings_date,
-                        "market": market
-                    })
+            else:
+                # DataFrame: 检查是否为空再提取
+                if cal.empty:
+                    continue
+                earnings_date = cal.get("Earnings Date")
+            if earnings_date:
+                upcoming_earnings.append({
+                    "symbol": symbol,
+                    "name": stock["name"],
+                    "date": earnings_date,
+                    "market": market
+                })
         except:
             continue
 ```
@@ -226,10 +227,10 @@ hist = t.earnings_history    # 历史 EPS beat/miss 记录
 ## ⚠️ 事件预警：FOMC 利率决议即将公布
 
 ### 基本信息
-- **会议日期**：2026-06-24 至 06-25
-- **决议公布**：06-25 02:00 (北京时间)
-- **鲍威尔记者会**：06-25 02:30 (北京时间)
-- **类型**：SEP 会议 (附带经济预测和点阵图)
+- **会议日期**：{meeting_start} 至 {meeting_end}（从 references/fed_schedule.md 查询）
+- **决议公布**：{announce_time} (北京时间)
+- **鲍威尔记者会**：决议公布后约 30 分钟
+- **类型**：{meeting_type}（Regular 或 SEP 会议）
 
 ### 市场定价
 ```

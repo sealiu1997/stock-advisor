@@ -22,12 +22,7 @@ description: >
 !`python3 -c "import yfinance, pandas; print('READY')" 2>/dev/null || echo "DEPS_MISSING"`
 ```
 
-如果 `DEPS_MISSING`：
-
-```python
-import subprocess, sys
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "yfinance", "pandas"])
-```
+如果 `DEPS_MISSING`：提示用户运行 `pip install -r requirements.txt`，本次无法执行此 skill。
 
 ---
 
