@@ -4,32 +4,26 @@
     "name": "liuhaiyang"
   },
   "metadata": {
-    "description": "智能股票分析助手 — 主线驱动的每日播报、持仓追踪、大盘分析、个股估值、新闻情绪，集成 PKS 市场认知连续性。",
-    "version": "2.0.0"
+    "description": "智能股票分析助手 — market_watcher 后台信息管理 + 主线驱动播报、持仓追踪、个股估值，集成 PKS 市场认知连续性，通过 Hermes 飞书推送。",
+    "version": "4.0.0"
   },
   "plugins": [
     {
       "name": "portfolio-tracker",
       "source": "./plugins/portfolio-tracker",
-      "description": "持仓管理与智能播报：数据查看、主线驱动的每日播报、PKS 市场认知管理。",
-      "version": "2.0.0"
+      "description": "持仓管理与智能播报：数据查看、主线驱动的每日播报 + 市场认知管理。",
+      "version": "4.0.0"
     },
     {
       "name": "market-analysis",
       "source": "./plugins/market-analysis",
-      "description": "市场分析工具集：大盘综述、个股估值、财报分析、经济事件日历。",
-      "version": "1.0.0"
-    },
-    {
-      "name": "news-sentiment",
-      "source": "./plugins/news-sentiment",
-      "description": "财经新闻抓取与社交媒体情绪分析。通过 yfinance 和 OpenCLI 采集新闻和社交数据。",
-      "version": "1.0.0"
+      "description": "市场分析工具集：个股估值、财报分析。",
+      "version": "2.0.0"
     },
     {
       "name": "source-readers",
       "source": "./plugins/source-readers",
-      "description": "信息源管理与聚合：通过 OpenCLI 追踪多平台博主动态，定期扫描并汇总分析。",
+      "description": "信息源管理与聚合：追踪多平台博主动态，定期扫描并汇总分析。",
       "version": "1.0.0"
     }
   ]

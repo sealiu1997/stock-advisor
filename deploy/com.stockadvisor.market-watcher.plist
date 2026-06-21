@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.stockadvisor.market-watcher</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>-m</string>
+        <string>market_watcher</string>
+        <string>run</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/liuhaiyang/code/Stock_Analysis/stock-advisor</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Users/liuhaiyang/code/Stock_Analysis/stock-advisor/scripts</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/liuhaiyang/code/Stock_Analysis/stock-advisor/data/watcher.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/liuhaiyang/code/Stock_Analysis/stock-advisor/data/watcher.err</string>
+
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+</dict>
+</plist>

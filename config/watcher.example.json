@@ -1,0 +1,66 @@
+{
+  "fred": {
+    "api_key": "YOUR_FRED_API_KEY",
+    "series": {
+      "us_cpi": "CPIAUCSL",
+      "us_core_cpi": "CPILFESL",
+      "us_nfp": "PAYEMS",
+      "us_unemployment": "UNRATE",
+      "us_gdp": "GDP",
+      "us_pce": "PCEPI",
+      "us_core_pce": "PCEPILFE",
+      "us_retail_sales": "RSAFS",
+      "us_ism_mfg": "MANEMP",
+      "us_initial_claims": "ICSA",
+      "us_10y": "DGS10",
+      "us_2y": "DGS2",
+      "us_5y": "DGS5",
+      "dxy": "DTWEXBGS"
+    }
+  },
+  "jin10": {
+    "server_url": "https://mcp.jin10.com/mcp",
+    "bearer_token": "YOUR_JIN10_BEARER_TOKEN",
+    "protocol_version": "2025-11-25"
+  },
+  "rss_feeds": [
+    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "label": "CNBC Top News", "tier": 1},
+    {"url": "https://feeds.marketwatch.com/marketwatch/topstories/", "label": "MarketWatch Top", "tier": 1},
+    {"url": "https://feeds.marketwatch.com/marketwatch/marketpulse/", "label": "MarketWatch Pulse", "tier": 2},
+    {"url": "https://seekingalpha.com/market_currents.xml", "label": "Seeking Alpha Currents", "tier": 2}
+  ],
+  "scan_intervals": {
+    "jin10_flash_minutes": 10,
+    "rss_minutes": 30,
+    "fred_minutes": 60,
+    "price_minutes": 15,
+    "earnings_minutes": 60
+  },
+  "price_alert_thresholds": {
+    "vix_level_high": 25,
+    "vix_level_critical": 30,
+    "ust_10y_daily_bp": 10,
+    "gold_pct": 2.0,
+    "oil_pct": 4.0,
+    "index_pct": 2.0,
+    "portfolio_stock_pct": 5.0
+  },
+  "impact_scoring": {
+    "data_miss_pct_high": 0.05,
+    "data_miss_pct_critical": 0.10
+  },
+  "notification": {
+    "critical_always": true,
+    "high_market_hours_only": true,
+    "market_hours": {"start": 8, "end": 23, "timezone": "Asia/Shanghai", "weekend": false},
+    "hermes": {
+      "hermes_dir": "/path/to/your/hermes",
+      "hermes_cmd": "hermes run",
+      "timeout": 120
+    }
+  },
+  "pks": {
+    "capsule": "market-context",
+    "domain": "research"
+  }
+}

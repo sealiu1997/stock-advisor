@@ -1,26 +1,86 @@
 ---
 name: daily-briefing
 description: >
-  智能每日市场播报 — 主线驱动的投研级晨报/收盘报。
-  当用户询问"今日播报"、"早报"、"晚报"、"收盘报"、"daily briefing"、
+  智能每日市场播报 + 市场认知管理。
+  播报模式：当用户询问"今日播报"、"早报"、"晚报"、"收盘报"、"daily briefing"、
   "今天市场怎么样"、"帮我分析今天行情"、"morning report"、
-  "今天发生了什么"、"market recap"时使用此技能。
+  "今天发生了什么"、"market recap"时触发。
+  认知管理模式：当用户询问"当前的市场叙事是什么"、"宏观认知"、"market context"、
+  "最近的分析记录"、"有哪些活跃叙事"、"更新市场判断"、"修正叙事"、
+  "这个判断不对"、"添加新的市场观点"、"expire narrative"时触发。
   也用于定时场景：每日自动生成主题化播报。
   与 my-stocks 的区别：my-stocks 是轻量级数据查看，
   daily-briefing 是有主线、有证据链、有连续性的深度分析。
   需要 PKS (Personal Knowledge State) 来维护市场认知连续性。
+  后台由 market_watcher 守护进程自动采集数据并更新 PKS。
 ---
 
-# Daily Briefing — 智能每日播报
+# Daily Briefing — 智能每日播报 + 市场认知管理
 
-生成有主线、有证据链、有市场连续性的每日投研播报。
-不是逐 ticker 平铺，而是"先定主线，再筛标的，再给证据"。
+两种操作模式：
+- **播报模式**（默认）：生成有主线、有证据链、有市场连续性的每日投研播报
+- **认知管理模式**：查看和管理 PKS 中的市场叙事、数据事实、分析历史
+
+播报不是逐 ticker 平铺，而是"先定主线，再筛标的，再给证据"。
 
 **核心原则：**
 - 每条分析必须有证据链：因子 → 传导 → 个股
 - 找不到证据宁可不写，不硬凑
 - 围绕主线展开，不散
 - 利用 PKS 保持跨会话连续性
+- 后台 `market_watcher` 已持续采集数据到 PKS，播报时直接读取
+
+---
+
+## Step 0: 模式判定
+
+根据用户意图判断操作模式：
+
+| 用户意图 | 模式 |
+|---------|------|
+| "今日播报" / "daily briefing" / "今天市场" | → **播报模式**（跳到 Step 1） |
+| "目前有哪些活跃叙事" / "市场认知" / "market context" | → **认知管理 — 查看** |
+| "最近的宏观数据" | → **认知管理 — 查看数据** |
+| "最近的分析记录" | → **认知管理 — 查看历史** |
+| "这个叙事应该过期了" / "expire" | → **认知管理 — 过期叙事** |
+| "加一个 XXX 叙事" / "新增" | → **认知管理 — 新增叙事** |
+| "修正 XXX" / "这个判断不对" | → **认知管理 — 修正叙事** |
+| "认知健康检查" | → **认知管理 — 健康检查** |
+
+### 认知管理操作
+
+**查看叙事：**
+```bash
+pks claim list --status accepted --tag narrative --domain research
+pks health market-context
+```
+输出活跃叙事列表，标注 stale claims 提醒用户 verify 或 expire。
+
+**查看数据事实：**
+```bash
+pks claim list --status accepted --type factual --domain research --tag macro
+```
+
+**查看日报历史：**
+```bash
+pks claim list --status accepted --subject "daily_briefing" --domain research
+```
+
+**过期叙事：** 需要用户确认 → `pks claim expire {claim_id}`
+
+**新增叙事：** 收集用户输入（核心判断、证据、传导、影响），按 `references/narrative_modeling.md` 构建 L1-L3 claims。
+
+**修正叙事：** `pks claim supersede {old_claim_id} --subject ... --object "{修正后的判断}"`
+
+**验证/刷新叙事：** `pks claim verify {claim_id}`
+
+**健康检查：** `pks health market-context` → 输出 accepted/stale/expired 统计 + 建议操作。
+
+认知管理操作完成后输出摘要，不执行播报流程。
+
+---
+
+以下 Step 1-8 为**播报模式**流程：
 
 ---
 
@@ -108,9 +168,26 @@ pks claim list --status accepted --subject "daily_briefing" --domain research
 
 ---
 
-## Step 3: 抓取框架数据
+## Step 3: 获取框架数据
 
-读取 `config/briefing.json` 获取 `framework_symbols`，然后批量抓取：
+### 3a. 优先从 PKS 读取（market_watcher 已采集）
+
+如果 PKS 可用，market_watcher 守护进程已持续将框架数据写入 PKS：
+
+```bash
+# 最近的价格异动
+pks claim list --status accepted --tag price --domain research --limit 20
+
+# 最近的宏观数据
+pks claim list --status accepted --tag macro,data --domain research --limit 20
+
+# 最近的新闻
+pks claim list --status accepted --subject jin10_flash --domain research --limit 20
+```
+
+### 3b. 实时补充抓取
+
+PKS 中的数据可能滞后几分钟到几小时。对关键框架指标做实时补充：
 
 ```python
 import yfinance as yf
@@ -141,9 +218,17 @@ data = yf.download(symbols, period="5d", group_by="ticker", progress=False)
 
 ---
 
-## Step 4: 抓取权威新闻
+## Step 4: 新闻汇总
 
-### 4a. yfinance 新闻（基础路径）
+### 4a. 从 PKS 读取 watcher 采集的新闻
+
+market_watcher 已通过 Jin10 MCP + RSS 持续采集新闻并存入 PKS。直接读取：
+
+```bash
+pks claim list --status accepted --tag news --domain research --limit 30
+```
+
+### 4b. yfinance 个股新闻（补充）
 
 ```python
 import yfinance as yf
@@ -164,27 +249,17 @@ for market in portfolio:
             all_news.extend(news)
         except Exception:
             pass
-
-# 主要指数新闻
-for idx in ["^GSPC", "^DJI", "GC=F", "CL=F"]:
-    try:
-        all_news.extend(yf.Ticker(idx).news or [])
-    except Exception:
-        pass
 ```
 
-### 4b. OpenCLI 新闻（增强路径，如果可用）
+### 4c. OpenCLI 新闻（增强路径，如果可用）
 
 ```bash
-# 国际一级源
 opencli bloomberg markets --limit 5 -f json
 opencli reuters business --limit 5 -f json
-
-# 中文财经
 opencli eastmoney hot --limit 5 -f json
 ```
 
-### 4c. 新闻分层标注
+### 4d. 新闻分层标注
 
 按 `config/briefing.json` 中 `news_source_tiers` 对新闻标注层级：
 - tier_1 → 可用于定调归因
@@ -406,6 +481,6 @@ with open("config/watchlist.json") as f:
 
 - `references/analysis_rules.md` — 主线检测标准、触发阈值、归因证据链规范、报告结构模板
 - `references/narrative_modeling.md` — PKS 中市场叙事的建模约定、标准命名、生命周期管理
+- `references/macro_indicators.md` — 宏观指标解读
+- `references/macro_data_guide.md` — 经济数据影响机制
 - `../my-stocks/references/data_sources.md` — yfinance / 腾讯财经 / Binance API 参考
-- `../../market-analysis/skills/market-overview/references/macro_indicators.md` — 宏观指标解读
-- `../../market-analysis/skills/event-calendar/references/macro_data_guide.md` — 经济数据影响机制

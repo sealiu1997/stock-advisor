@@ -29,49 +29,61 @@ stock-advisor/
 ├── .claude-plugin/
 │   └── marketplace.json              # 插件市场注册（Claude 生态）
 │
-├── plugins/                           # 所有 skill 按插件组组织
-│   ├── portfolio-tracker/             # 插件组 1: 持仓追踪与智能播报
+├── scripts/                           # 后台信息管理系统
+│   └── market_watcher/                # 核心: 事件驱动数据采集守护进程
+│       ├── __main__.py                # CLI 入口
+│       ├── daemon.py                  # 主调度循环
+│       ├── pks.py                     # PKS Python API 封装
+│       ├── scorer.py                  # 4 级影响评分引擎
+│       ├── trigger.py                 # Hermes 唤醒通知
+│       ├── core/                      # 分析层
+│       │   ├── overview.py            #   宏观信号评估 (VIX/利率/美元/商品/指数)
+│       │   ├── calendar.py            #   经济日历监控
+│       │   └── analyzer.py            #   主题检测 + 叙事生命周期
+│       └── sources/                   # 数据采集层
+│           ├── fred.py                #   FRED API
+│           ├── jin10.py               #   金十 MCP (Streamable HTTP)
+│           ├── rss.py                 #   RSS/Atom
+│           └── price.py              #   yfinance 价格异动
+│
+├── plugins/                           # Agent Skills (前台交互)
+│   ├── portfolio-tracker/             # 持仓追踪与智能播报
 │   │   ├── plugin.json
 │   │   └── skills/
-│   │       ├── my-stocks/             # 轻量级持仓数据查看
+│   │       ├── daily-briefing/        # 主线驱动的智能播报 + 市场认知管理
 │   │       │   ├── SKILL.md
 │   │       │   └── references/
-│   │       ├── daily-briefing/        # 主线驱动的智能每日播报 (v2)
-│   │       │   ├── SKILL.md
-│   │       │   └── references/
-│   │       │       ├── analysis_rules.md      # 分析规则引擎
-│   │       │       └── narrative_modeling.md   # PKS 叙事建模约定
-│   │       └── market-context/        # 市场认知状态管理
-│   │           └── SKILL.md
+│   │       │       ├── analysis_rules.md
+│   │       │       ├── narrative_modeling.md
+│   │       │       ├── macro_indicators.md
+│   │       │       └── macro_data_guide.md
+│   │       └── my-stocks/             # 轻量级持仓数据查看
+│   │           ├── SKILL.md
+│   │           └── references/
 │   │
-│   ├── market-analysis/               # 插件组 2: 市场分析
+│   ├── market-analysis/               # 市场分析
 │   │   ├── plugin.json
 │   │   └── skills/
-│   │       ├── market-overview/       # 大盘综述与宏观概览
-│   │       ├── stock-valuation/       # 个股估值 (P2)
-│   │       ├── earnings-analysis/     # 财报分析 (P2)
-│   │       └── event-calendar/        # 经济事件日历与节点播报
+│   │       ├── stock-valuation/       # 个股估值
+│   │       └── earnings-analysis/     # 财报分析
 │   │
-│   ├── news-sentiment/                # 插件组 3: 新闻与情绪 (P3)
-│   │   ├── plugin.json
-│   │   └── skills/
-│   │       ├── market-news/           # 财经新闻抓取与解读
-│   │       └── stock-sentiment/       # 社交媒体情绪分析
-│   │
-│   └── source-readers/                # 插件组 4: 信息源管理与聚合 (P3)
+│   └── source-readers/                # 信息源管理与聚合
 │       ├── plugin.json
 │       └── skills/
-│           ├── source-manager/        # 信息源管理（添加/删除/列表博主追踪）
-│           │   └── references/
-│           │       └── platform_adapters.md  # 平台 URL 解析 + OpenCLI 命令映射
-│           └── source-feed/           # 信息源聚合阅读（定期扫描 + 汇总分析）
+│           ├── source-manager/        # 信息源追踪管理
+│           └── source-feed/           # 信息源聚合扫描
 │
 ├── config/                            # 用户个人配置
 │   ├── portfolio.json                 # 实盘持仓
 │   ├── watchlist.json                 # 关注列表
 │   ├── events.json                    # 关注的宏观事件
 │   ├── sources.json                   # 关注的博主/信息源 (P3)
-│   └── briefing.json                  # 播报配置：触发阈值、新闻源分层、输出偏好 (v2)
+│   ├── briefing.json                  # 播报配置：触发阈值、新闻源分层、输出偏好
+│   ├── watcher.json                   # 数据源凭证 + 扫描配置 (gitignored)
+│   └── watcher.example.json           # watcher 示例配置（占位 key）
+│
+├── deploy/                            # 部署配置
+│   └── com.stockadvisor.market-watcher.plist  # macOS launchd
 │
 └── legacy_reference/                  # 旧版代码，仅供参考
 ```
@@ -322,29 +334,22 @@ config/sources.json    ──→  source-manager (管理关注源)
 
 ### 4.1 场景化播报时间表
 
-| 时段 | 触发时间 | 播报内容 | 触发 Skills |
+| 时段 | 触发时间 | 播报内容 | 触发方式 |
 |---|---|---|---|
-| 美股盘后复盘 | 工作日 08:00 (北京) | 隔夜美股表现 + 持仓盈亏 + 今日港股展望 | my-stocks + market-overview |
-| 港股收盘总结 | 工作日 17:00 (北京) | 港股收盘 + 持仓盈亏 + 今晚美股前瞻 | my-stocks + market-overview |
-| 事件预警 | 事件前 N 小时 | 针对性的事件背景和影响分析 | event-calendar |
-| 财报预警 | 财报前 2 天 | 分析师预期 + 历史表现 | event-calendar |
-| 周末复盘 | 周六 10:00 | 本周回顾 + 加密市场 + 下周日历 | my-stocks + market-overview + event-calendar |
+| 美股盘后复盘 | 工作日 08:00 (北京) | 隔夜美股表现 + 持仓盈亏 + 今日港股展望 | Hermes Schedule → daily-briefing |
+| 港股收盘总结 | 工作日 17:00 (北京) | 港股收盘 + 持仓盈亏 + 今晚美股前瞻 | Hermes Schedule → daily-briefing |
+| 事件预警 | 实时 | Critical/High 事件实时推送 | market_watcher → 唤醒 Hermes → 飞书 |
+| 周末复盘 | 周六 10:00 | 本周回顾 + 加密市场 + 下周日历 | Hermes Schedule → daily-briefing |
 
 ### 4.2 平台对接方式
 
-**Hermes (推荐):**
-- 使用 Hermes 的 Routine/Schedule 功能设置定时任务
-- 每个时段对应一条 prompt，例如：
+**Hermes + market_watcher (推荐):**
+- 定时播报：使用 Hermes 的 Routine/Schedule 功能设置定时任务
   ```
-  "[美股早报] 请执行 my-stocks 和 market-overview 技能，以美股早报模式输出"
+  "[每日播报] 请执行 daily-briefing 技能，生成今日市场播报并发送"
   ```
-
-**OpenClaw:**
-- 通过 OpenClaw 的定时触发配置（cron 语法）
-- 触发消息与 Hermes 类似
-
-**Claude Code:**
-- 使用 `/schedule` 功能设置 cron 任务
+- 实时预警：market_watcher 后台检测到异动后唤醒 Hermes，Hermes 自主分析后通过飞书推送
+- market_watcher 只负责"叫醒"，消息的组织和发送完全由 Hermes 完成
 - 或手动触发："帮我看看今天的行情"
 
 ---
@@ -506,8 +511,7 @@ SKILL.md 中通过 Step 1 检测流程实现：先检测可用工具，再决定
 
 | 交付物 | 说明 |
 |---|---|
-| daily-briefing SKILL.md | 主线驱动的智能播报，替代定时场景中的 my-stocks |
-| market-context SKILL.md | PKS 市场认知层的查看、修正、管理 |
+| daily-briefing SKILL.md | 主线驱动的智能播报 + 市场认知管理（合并原 market-context） |
 | analysis_rules.md | 分析规则引擎：主线检测、触发阈值、证据链标准、报告结构 |
 | narrative_modeling.md | PKS 中市场叙事的建模约定：命名、层级、生命周期 |
 | briefing.json | 播报配置：驱动因素、触发阈值、新闻源分层、输出偏好 |
@@ -518,6 +522,32 @@ SKILL.md 中通过 Step 1 检测流程实现：先检测可用工具，再决定
 - 港股早报自动继承隔夜美股主线，无需重新推导
 - 人类通过 PKS Dashboard 审计和修正 Agent 的市场判断
 - 无证据的分析不输出，避免"站不住脚"的归因
+
+### Phase 5 — 事件驱动数据采集
+
+| 交付物 | 说明 |
+|---|---|
+| `scripts/market_watcher/` | Python 后台守护进程：持续采集数据并更新 PKS |
+| `sources/fred.py` | FRED API 客户端：CPI、NFP、GDP 等宏观数据 |
+| `sources/jin10.py` | 金十数据 MCP 客户端：快讯、经济日历、实时行情 |
+| `sources/rss.py` | RSS/Atom 聚合：CNBC、MarketWatch、SeekingAlpha |
+| `sources/price.py` | yfinance 价格异动检测 |
+| `pks.py` | PKS CLI 封装：自动化 claim 读写 |
+| `scorer.py` | 影响评分引擎：Critical/High/Medium/Low 四级分类 |
+| `trigger.py` | Agent 触发接口：飞书 / Hermes / stdout |
+| `daemon.py` | 主调度循环 |
+| `__main__.py` | CLI 入口：run / scan / status / narratives / test |
+| `deploy/com.stockadvisor.market-watcher.plist` | macOS launchd 部署配置 |
+| `config/watcher.json` | 数据源凭证 + 扫描间隔 + 阈值（gitignored） |
+| `config/watcher.example.json` | 示例配置（占位 key，可提交） |
+
+**P5 完成后可实现：**
+- FRED 宏观数据发布后自动写入 PKS，无需播报时实时拉取
+- 金十快讯持续监控，Critical/High 事件主动推送飞书通知
+- RSS 新闻自动采集，去重后入库
+- 价格异动自动检测，超阈值写入 PKS + 触发通知
+- Mac mini 上 launchd 部署，开机自启、崩溃自动重启
+- daily-briefing 直接从 PKS 读取已采集的数据，减少播报延迟
 
 ---
 
@@ -692,9 +722,108 @@ L3 持仓映射 (inference)    "GOOG/MSFT 受益; 黄金受益于实际利率下
 
 ---
 
-## 10. 扩展性设计
+## 10. P5 架构：事件驱动数据采集
 
-### 10.1 新增 Skill 的标准流程
+### 10.1 设计动机
+
+P4 的 daily-briefing 在每次播报时实时拉取数据和新闻，有两个问题：
+1. **延迟高**：每次播报都要等 yfinance + 新闻抓取完成
+2. **遗漏事件**：定时播报之间发生的 Critical 事件（如突发降息）无法及时通知
+
+P5 引入 `market_watcher` 后台守护进程，将"数据采集"从"分析播报"中解耦。
+
+### 10.2 架构
+
+```
+                        数据源层
+     ┌──────────┬──────────┬──────────┬──────────┐
+     │ FRED API │ Jin10 MCP│ RSS Feeds│ yfinance │
+     │ (宏观数据) │ (快讯/行情) │ (英文新闻) │ (价格异动) │
+     └────┬─────┴────┬─────┴────┬─────┴────┬─────┘
+          │          │          │          │
+          └──────────┼──────────┼──────────┘
+                     │
+              ┌──────┴──────┐
+              │ scorer.py   │  影响评分
+              │ 4-level     │  Critical → notify + PKS
+              │ scoring     │  High     → notify + PKS
+              │             │  Medium   → PKS only
+              │             │  Low      → discard
+              └──────┬──────┘
+                     │
+          ┌──────────┼──────────┐
+          │          │          │
+     ┌────┴────┐ ┌──┴──┐ ┌────┴────┐
+     │ pks.py  │ │ log │ │trigger  │
+     │ claim   │ │     │ │ 飞书/   │
+     │ write   │ │     │ │ Hermes  │
+     └─────────┘ └─────┘ └─────────┘
+```
+
+### 10.3 扫描间隔
+
+| 数据源 | 默认间隔 | 说明 |
+|---|---|---|
+| Jin10 快讯 | 10 分钟 | 最高频，覆盖突发事件 |
+| 价格异动 | 15 分钟 | 框架指标 + 持仓超阈值检测 |
+| RSS 新闻 | 30 分钟 | 英文财经媒体聚合 |
+| FRED 数据 | 60 分钟 | 宏观数据发布频率低 |
+
+### 10.4 影响评分规则
+
+| 级别 | 条件 | 处理 |
+|---|---|---|
+| Critical | 美联储利率决议、CPI/NFP/GDP 发布、T1 源报道衰退/危机 | PKS + 即时通知 |
+| High | 重要宏观数据、框架指标超阈值、T1/T2 重要新闻 | PKS + 即时通知 |
+| Medium | 一般宏观数据、T1 普通新闻 | 静默写入 PKS |
+| Low | T3 新闻、无明显影响 | 丢弃 |
+
+### 10.5 部署方式
+
+Mac mini 上使用 macOS 原生 launchd 管理：
+
+```bash
+# 安装
+cp deploy/com.stockadvisor.market-watcher.plist ~/Library/LaunchAgents/
+
+# 启动
+launchctl load ~/Library/LaunchAgents/com.stockadvisor.market-watcher.plist
+
+# 停止
+launchctl unload ~/Library/LaunchAgents/com.stockadvisor.market-watcher.plist
+
+# 查看日志
+tail -f data/watcher.log
+```
+
+CLI 管理命令：
+
+```bash
+# 运行单次扫描
+python -m market_watcher scan
+
+# 测试单个数据源
+python -m market_watcher test fred
+python -m market_watcher test jin10
+
+# 查看运行状态
+python -m market_watcher status
+
+# 查看活跃叙事
+python -m market_watcher narratives
+```
+
+### 10.6 market-context 合并
+
+P4 中独立的 `market-context` skill 已合并到 `daily-briefing` 作为"认知管理模式"。
+用户说"市场叙事"/"market context"时，daily-briefing 进入认知管理子流程，而非播报流程。
+数据采集层面的自动化 PKS 操作由 market_watcher 守护进程负责。
+
+---
+
+## 11. 扩展性设计
+
+### 11.1 新增 Skill 的标准流程
 
 1. 在对应 `plugins/<group>/skills/` 下新建目录
 2. 编写 SKILL.md（frontmatter + 分步指令 + 引用 references）
@@ -703,13 +832,13 @@ L3 持仓映射 (inference)    "GOOG/MSFT 受益; 黄金受益于实际利率下
 
 无需修改任何其他 skill 或全局配置。
 
-### 10.2 新增数据源的标准流程
+### 11.2 新增数据源的标准流程
 
 1. 在 SKILL.md 的 Step 1 检测流程中加入新数据源的检测
 2. 在 Decision Tree 中加入新路径
 3. 将 API 文档放入 `references/` 供 agent 参考
 
-### 10.3 新增信息源平台
+### 11.3 新增信息源平台
 
 1. 在 `source-manager/references/platform_adapters.md` 中添加新平台的 URL 正则和 OpenCLI 命令
 2. `source-manager` skill 自动支持新平台的 URL 解析和追踪
@@ -718,7 +847,7 @@ L3 持仓映射 (inference)    "GOOG/MSFT 受益; 黄金受益于实际利率下
 
 ---
 
-## 11. 约束与原则
+## 12. 约束与原则
 
 1. **只读原则**：所有 skill 均为只读，永远不执行交易操作
 2. **免费优先**：优先使用免费数据源，付费 API 作为可选增强

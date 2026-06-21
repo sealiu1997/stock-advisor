@@ -1,0 +1,5 @@
+config/watcher.json
+__pycache__/
+*.pyc
+.env
+data/
