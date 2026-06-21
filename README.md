@@ -8,7 +8,9 @@
 
 | 插件组 | Skill | 说明 |
 |---|---|---|
-| **portfolio-tracker** | `my-stocks` | 持仓行情播报 — 港美股 + 加密货币，自动识别播报时段，异动告警 |
+| **portfolio-tracker** | `daily-briefing` | **智能每日播报** — 主线驱动，有证据链，集成 PKS 市场认知连续性 |
+| | `my-stocks` | 轻量级持仓数据查看 — 港美股 + 加密货币行情和盈亏 |
+| | `market-context` | 市场认知管理 — 查看/修正/新增 PKS 中的活跃叙事和数据事实 |
 | **market-analysis** | `market-overview` | 大盘综述 — 全球指数、宏观指标、板块热力图、情绪评估 |
 | | `event-calendar` | 经济事件日历 — FOMC/CPI/NFP 等事前预警 + 事后解读，持仓财报日提醒 |
 | | `stock-valuation` | 个股估值 — DCF + 相对估值 + SOTP，敏感性分析，Bull/Base/Bear 场景 |
@@ -28,9 +30,10 @@ stock-advisor/
 │   ├── portfolio.json             # 实盘持仓（港美股 + 加密）
 │   ├── watchlist.json             # 关注列表
 │   ├── events.json                # 宏观事件配置
-│   └── sources.json               # 博主/信息源追踪列表
+│   ├── sources.json               # 博主/信息源追踪列表
+│   └── briefing.json              # 播报配置（触发阈值、新闻源分层）
 ├── plugins/
-│   ├── portfolio-tracker/         # 持仓追踪
+│   ├── portfolio-tracker/         # 持仓追踪与智能播报（3 个 skill）
 │   ├── market-analysis/           # 市场分析（4 个 skill）
 │   ├── news-sentiment/            # 新闻与情绪（2 个 skill）
 │   └── source-readers/            # 信息源管理（2 个 skill）
@@ -69,10 +72,21 @@ stock-advisor/
 ### Claude Code
 
 ```bash
-# 手动查询
-"帮我看看今天的行情"           # → my-stocks
+# 每日播报（主线驱动的智能分析）
+"今日播报"                     # → daily-briefing
+"早报"                         # → daily-briefing
+"帮我分析今天行情"              # → daily-briefing
+
+# 市场认知管理
+"当前有哪些活跃叙事"            # → market-context
+"降息交易这个叙事该过期了"       # → market-context
+
+# 数据查看
+"帮我看看持仓数据"              # → my-stocks
 "大盘怎么样"                   # → market-overview
 "近期有什么重要数据发布"        # → event-calendar
+
+# 深度分析
 "帮我估值一下 NVDA"            # → stock-valuation
 "TSLA 财报分析"                # → earnings-analysis
 "最近有什么财经新闻"            # → market-news
@@ -91,6 +105,7 @@ stock-advisor/
 - **watchlist.json** — 关注但未持仓的标的
 - **events.json** — 关注的宏观事件类型及预警提前量
 - **sources.json** — 追踪的博主和信息源
+- **briefing.json** — 播报触发阈值、新闻源分层、驱动因素类型、输出偏好
 
 ## 依赖
 
@@ -99,6 +114,7 @@ pip install -r requirements.txt
 ```
 
 - **Python 3.9+** + `yfinance` — 行情与财务数据（必需）
+- **[PKS](https://github.com/sealiu1997/personal_knowledge_state)**（推荐）— 市场认知连续性，daily-briefing 首次运行时会引导安装
 - **[OpenCLI](https://github.com/jackwener/OpenCLI)**（可选）— 社交媒体和新闻采集，需配合 Chrome + Browser Bridge 插件
 
 ## 设计文档

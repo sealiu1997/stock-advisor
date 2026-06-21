@@ -4,15 +4,15 @@
     "name": "liuhaiyang"
   },
   "metadata": {
-    "description": "智能股票分析助手 — 持仓播报、大盘综述、经济事件日历、个股估值与新闻情绪分析。",
-    "version": "1.0.0"
+    "description": "智能股票分析助手 — 主线驱动的每日播报、持仓追踪、大盘分析、个股估值、新闻情绪，集成 PKS 市场认知连续性。",
+    "version": "2.0.0"
   },
   "plugins": [
     {
       "name": "portfolio-tracker",
       "source": "./plugins/portfolio-tracker",
-      "description": "实盘持仓行情播报与盈亏分析，支持港美股、外汇、商品和加密货币。",
-      "version": "1.0.0"
+      "description": "持仓管理与智能播报：数据查看、主线驱动的每日播报、PKS 市场认知管理。",
+      "version": "2.0.0"
     },
     {
       "name": "market-analysis",

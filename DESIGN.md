@@ -30,12 +30,19 @@ stock-advisor/
 │   └── marketplace.json              # 插件市场注册（Claude 生态）
 │
 ├── plugins/                           # 所有 skill 按插件组组织
-│   ├── portfolio-tracker/             # 插件组 1: 持仓追踪
+│   ├── portfolio-tracker/             # 插件组 1: 持仓追踪与智能播报
 │   │   ├── plugin.json
 │   │   └── skills/
-│   │       └── my-stocks/             # 持仓行情播报
-│   │           ├── SKILL.md
-│   │           └── references/
+│   │       ├── my-stocks/             # 轻量级持仓数据查看
+│   │       │   ├── SKILL.md
+│   │       │   └── references/
+│   │       ├── daily-briefing/        # 主线驱动的智能每日播报 (v2)
+│   │       │   ├── SKILL.md
+│   │       │   └── references/
+│   │       │       ├── analysis_rules.md      # 分析规则引擎
+│   │       │       └── narrative_modeling.md   # PKS 叙事建模约定
+│   │       └── market-context/        # 市场认知状态管理
+│   │           └── SKILL.md
 │   │
 │   ├── market-analysis/               # 插件组 2: 市场分析
 │   │   ├── plugin.json
@@ -63,7 +70,8 @@ stock-advisor/
 │   ├── portfolio.json                 # 实盘持仓
 │   ├── watchlist.json                 # 关注列表
 │   ├── events.json                    # 关注的宏观事件
-│   └── sources.json                   # 关注的博主/信息源 (P3)
+│   ├── sources.json                   # 关注的博主/信息源 (P3)
+│   └── briefing.json                  # 播报配置：触发阈值、新闻源分层、输出偏好 (v2)
 │
 └── legacy_reference/                  # 旧版代码，仅供参考
 ```
@@ -494,6 +502,23 @@ SKILL.md 中通过 Step 1 检测流程实现：先检测可用工具，再决定
 | news_sources.md | 新闻源权威性评级 + OpenCLI 财经媒体命令 |
 | sources.json | 重构后的统一信息源配置 |
 
+### Phase 4 — 认知连续性（PKS 集成）
+
+| 交付物 | 说明 |
+|---|---|
+| daily-briefing SKILL.md | 主线驱动的智能播报，替代定时场景中的 my-stocks |
+| market-context SKILL.md | PKS 市场认知层的查看、修正、管理 |
+| analysis_rules.md | 分析规则引擎：主线检测、触发阈值、证据链标准、报告结构 |
+| narrative_modeling.md | PKS 中市场叙事的建模约定：命名、层级、生命周期 |
+| briefing.json | 播报配置：驱动因素、触发阈值、新闻源分层、输出偏好 |
+
+**P4 完成后可实现：**
+- 每次播报先定主线，再筛标的，围绕主题展开有证据链的分析
+- 市场认知跨会话持久化（叙事、数据事实、传导逻辑）
+- 港股早报自动继承隔夜美股主线，无需重新推导
+- 人类通过 PKS Dashboard 审计和修正 Agent 的市场判断
+- 无证据的分析不输出，避免"站不住脚"的归因
+
 ---
 
 ## 8. P3 架构：OpenCLI 驱动的信息采集
@@ -582,9 +607,94 @@ SKILL.md 中通过 Step 1 检测流程实现：先检测可用工具，再决定
 
 ---
 
-## 9. 扩展性设计
+## 9. P4 架构：PKS 市场认知层
 
-### 9.1 新增 Skill 的标准流程
+### 9.1 设计动机
+
+P1-P3 的每次播报都是"无状态"的——相当于一个失忆的分析师每天重新看盘。
+真正的分析师脑子里有一个持续更新的宏观图景：美联储处于什么周期、市场在交易什么叙事、哪些风险在累积。
+
+P4 通过集成 [PKS (Personal Knowledge State)](https://github.com/sealiu1997/personal_knowledge_state) 解决这个问题。
+
+### 9.2 核心概念映射
+
+| PKS 概念 | 市场认知层对应 |
+|---|---|
+| Claim (factual) | 数据事实："2026-06 CPI 3.1% YoY" |
+| Claim (inference) | 市场叙事："市场交易 disinflation → 降息预期" |
+| Evidence | 来源标注：Bloomberg / BLS / Reuters |
+| Supporting Claims | 证据链：叙事 ← 数据事实 |
+| Lifecycle | 叙事状态：active → stale → expired / superseded |
+| confidence | 分析置信度 0.0-1.0 |
+| Capsule | MarketContext 胶囊 |
+
+### 9.3 叙事建模层级
+
+```
+L0 数据事实 (factual)     "10Y yield fell 8bp to 4.17%"
+      ↑ supports
+L1 市场叙事 (inference)    "Disinflation trade: 市场定价 H2 降息 2-3 次"
+      ↑ supports
+L2 传导机制 (inference)    "长端利率下 → 成长股估值修复"
+      ↑ supports
+L3 持仓映射 (inference)    "GOOG/MSFT 受益; 黄金受益于实际利率下降"
+```
+
+每一层都可以独立验证、独立过期、独立被人类 dispute。
+
+### 9.4 数据流
+
+```
+                      PKS (知识状态层)
+                    ┌─────────────────────┐
+                    │  MarketContext 胶囊   │
+                    │  ┌─ factual claims   │◄── 数据事实（自动 accept）
+                    │  ├─ inference claims │◄── 叙事 + 传导 + 影响
+                    │  ├─ evidence refs    │◄── 新闻来源标注
+                    │  └─ claim queries    │──► 宏观认知摘要
+                    └────────┬────────────┘
+                    CLI read/write│
+                             │
+    ┌────────────────────────┼────────────────────────┐
+    │              daily-briefing skill                │
+    │  1. 读 PKS claims → 获取活跃叙事和历史数据       │
+    │  2. 抓新数据 + 新闻 → yfinance + OpenCLI         │
+    │  3. 对比新旧 → 延续/更新/新增/过期叙事           │
+    │  4. 写回 PKS → pks claim add/verify/supersede    │
+    │  5. 基于活跃叙事 → 筛标的 → 主题化分析           │
+    │  6. 输出播报                                     │
+    └─────────────────────────────────────────────────┘
+                             │
+                    ┌────────┴────────┐
+                    │  PKS Dashboard  │◄── 人类审计：review / dispute / correct
+                    └─────────────────┘
+```
+
+### 9.5 连续性机制
+
+- 周一早报写入 CPI 数据 + 降息叙事 → 存入 PKS
+- 周二早报读取 PKS → 看到"降息叙事 active, confidence 0.85" → 延续分析
+- 新数据支持 → `pks claim verify` 刷新，追加 evidence，confidence 上调
+- 新数据矛盾 → `pks claim supersede`，建立新叙事
+- 叙事超过 14 天未刷新 → PKS 自动标记 stale → Agent 下次播报时决定 verify 或 expire
+- 人类打开 Dashboard → 审计本周所有 claim，修正不准的推断
+
+### 9.6 播报架构变化
+
+| | my-stocks (P1) | daily-briefing (P4) |
+|---|---|---|
+| 定位 | 数据查看 | 智能分析 |
+| 分析方式 | 逐 ticker 平铺 | 主线驱动，有选择 |
+| 证据 | 无要求 | 因子→传导→个股链条 |
+| 连续性 | 无 | PKS 跨会话持久化 |
+| 跳过机制 | 无（全部覆盖）| 低波动+无关主线 → 跳过 |
+| 归因质量 | 可能硬凑 | 无证据则不输出 |
+
+---
+
+## 10. 扩展性设计
+
+### 10.1 新增 Skill 的标准流程
 
 1. 在对应 `plugins/<group>/skills/` 下新建目录
 2. 编写 SKILL.md（frontmatter + 分步指令 + 引用 references）
@@ -593,13 +703,13 @@ SKILL.md 中通过 Step 1 检测流程实现：先检测可用工具，再决定
 
 无需修改任何其他 skill 或全局配置。
 
-### 9.2 新增数据源的标准流程
+### 10.2 新增数据源的标准流程
 
 1. 在 SKILL.md 的 Step 1 检测流程中加入新数据源的检测
 2. 在 Decision Tree 中加入新路径
 3. 将 API 文档放入 `references/` 供 agent 参考
 
-### 9.3 新增信息源平台
+### 10.3 新增信息源平台
 
 1. 在 `source-manager/references/platform_adapters.md` 中添加新平台的 URL 正则和 OpenCLI 命令
 2. `source-manager` skill 自动支持新平台的 URL 解析和追踪
@@ -608,7 +718,7 @@ SKILL.md 中通过 Step 1 检测流程实现：先检测可用工具，再决定
 
 ---
 
-## 10. 约束与原则
+## 11. 约束与原则
 
 1. **只读原则**：所有 skill 均为只读，永远不执行交易操作
 2. **免费优先**：优先使用免费数据源，付费 API 作为可选增强

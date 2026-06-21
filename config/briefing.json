@@ -1,0 +1,66 @@
+{
+  "trigger_thresholds": {
+    "must_analyze": {
+      "stocks": 3.0,
+      "crypto": 5.0,
+      "fx_commodity": 1.5,
+      "indices": 1.5
+    },
+    "brief_mention": {
+      "stocks": 1.0,
+      "crypto": 3.0,
+      "fx_commodity": 0.8,
+      "indices": 0.8
+    }
+  },
+  "news_source_tiers": {
+    "tier_1": {
+      "role": "定调归因 — 只有一级源可以作为主线的核心证据",
+      "sources": ["Bloomberg", "Reuters", "Financial Times", "Wall Street Journal", "AP", "Dow Jones"]
+    },
+    "tier_2": {
+      "role": "补充细节 — 个股新闻、分析师观点、行业报告",
+      "sources": ["CNBC", "MarketWatch", "Barron's", "Seeking Alpha", "Yahoo Finance", "Nikkei Asia", "SCMP", "华尔街见闻", "财联社", "第一财经"]
+    },
+    "tier_3": {
+      "role": "情绪旁证 — 只能辅助，不能主导结论",
+      "sources": ["Reddit", "Twitter/X", "雪球", "东方财富", "Motley Fool", "Business Insider"]
+    }
+  },
+  "framework_symbols": {
+    "us_indices": ["^GSPC", "^IXIC", "^DJI"],
+    "asia_indices": ["^HSI", "000001.SS", "^N225"],
+    "rates": {
+      "us_2y": "^IRX",
+      "us_5y": "^FVX",
+      "us_10y": "^TNX"
+    },
+    "macro": {
+      "vix": "^VIX",
+      "dxy": "DX-Y.NYB",
+      "gold": "GC=F",
+      "oil": "CL=F",
+      "btc": "BTC-USD"
+    }
+  },
+  "driver_types": [
+    {"id": "macro_data", "label": "宏观数据", "examples": "CPI, NFP, PPI, GDP, Retail Sales, Jobless Claims"},
+    {"id": "rates", "label": "利率驱动", "examples": "2Y/5Y/10Y 收益率大幅变动, 收益率曲线形变, DXY 异动"},
+    {"id": "geopolitical", "label": "地缘政治", "examples": "中东冲突, 俄乌, 贸易战, 制裁, 关税"},
+    {"id": "commodity", "label": "商品驱动", "examples": "黄金/原油/铜/天然气大幅波动, OPEC 决议"},
+    {"id": "sector", "label": "行业驱动", "examples": "AI/半导体/新能源/银行/地产链集体异动"},
+    {"id": "stock_specific", "label": "个股事件", "examples": "财报, 指引, 并购, 监管, 诉讼, 管理层变动"}
+  ],
+  "pks": {
+    "capsule_name": "market-context",
+    "domain": "research",
+    "auto_accept_factual": true,
+    "stale_days_factual": 7,
+    "stale_days_inference": 14
+  },
+  "output": {
+    "max_detailed_tickers": 6,
+    "skip_message": "其余持仓波动不大，暂无需要重点解读的新增信息。",
+    "confidence_threshold": "medium"
+  }
+}

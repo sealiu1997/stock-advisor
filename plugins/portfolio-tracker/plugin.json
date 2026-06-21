@@ -1,7 +1,7 @@
 {
   "name": "portfolio-tracker",
-  "description": "实盘持仓行情播报与盈亏分析，支持港美股、外汇、商品和加密货币。",
-  "version": "1.0.0",
+  "description": "持仓管理与智能播报：数据查看 (my-stocks)、主线驱动的每日播报 (daily-briefing)、市场认知管理 (market-context)。",
+  "version": "2.0.0",
   "author": {
     "name": "liuhaiyang"
   },
@@ -9,7 +9,9 @@
     "portfolio",
     "stocks",
     "holdings",
-    "pnl",
+    "briefing",
+    "narrative",
+    "pks",
     "crypto",
     "hk-stocks"
   ]
