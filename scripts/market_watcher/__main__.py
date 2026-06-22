@@ -113,6 +113,78 @@ def cmd_material(args):
         print(f"  {d.isoformat()}  {total:>4d} items  ({detail}){marker}")
 
 
+def cmd_select(args):
+    """Run daily selection: score material → pick top N → promote to PKS."""
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    from .selector import run_daily_selection, select_daily_facts, select_daily_inferences
+    from .material import MaterialStore
+    from .core.analyzer import analyze_cycle
+
+    store = MaterialStore()
+    from datetime import date
+    day = date.today()
+
+    if args.dry_run:
+        facts = select_daily_facts(store, day)
+        all_data = store.load_all(day)
+        all_events, all_signals = [], []
+        for source, items in all_data.items():
+            for item in items:
+                if source == "overview":
+                    all_signals.append(item)
+                else:
+                    desc = item.get("content") or item.get("title") or item.get("signal") or ""
+                    all_events.append({"type": source, "description": desc, "level": item.get("_level", "medium")})
+        themes = analyze_cycle(all_events, all_signals)
+        inferences = select_daily_inferences(themes)
+
+        print(f"=== Dry Run: {day.isoformat()} ===")
+        print(f"\nFacts ({len(facts)} selected, max 20):")
+        for i, f in enumerate(facts, 1):
+            print(f"  {i:2d}. [{f['_score']:4.1f}] [{f['_source']:10s}] {f['object'][:80]}")
+        print(f"\nInferences ({len(inferences)} selected, max 5):")
+        for i, inf in enumerate(inferences, 1):
+            print(f"  {i:2d}. [{inf['_score']:4.1f}] {inf['object'][:80]}")
+    else:
+        report = run_daily_selection(store)
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+def cmd_refine(args):
+    """B5 Layer 2: Agent-based inference refinement."""
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    from .agent_refine import build_refinement_prompt, refine_inferences
+    from .material import MaterialStore
+    from datetime import date
+
+    store = MaterialStore()
+    day = date.today()
+    raw = store.load_selection("selected_inferences.json", day)
+
+    if not raw:
+        print("No inferences selected today. Run 'select' first.")
+        return
+
+    if args.prompt_only:
+        from .agent_refine import _get_portfolio_summary
+        from . import pks
+        active = pks.get_active_narratives()
+        narratives = [
+            (n.object if hasattr(n, "object") else n.get("object", ""))[:100]
+            for n in active
+        ]
+        prompt = build_refinement_prompt(raw, _get_portfolio_summary(), narratives)
+        print(prompt)
+    else:
+        print(f"Found {len(raw)} rule-selected inferences.")
+        print("Agent refinement requires an agent_call function.")
+        print("Use --prompt-only to see the prompt for manual agent use.")
+
+
 def cmd_test_source(args):
     import logging
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -224,6 +296,12 @@ def main():
 
     sub.add_parser("material", help="Show today's raw material stats")
 
+    sel_p = sub.add_parser("select", help="Run daily selection (material → PKS)")
+    sel_p.add_argument("--dry-run", action="store_true", help="Show what would be selected without writing to PKS")
+
+    ref_p = sub.add_parser("refine", help="B5 Layer 2: agent inference refinement")
+    ref_p.add_argument("--prompt-only", action="store_true", help="Output the agent prompt without calling agent")
+
     test_p = sub.add_parser("test", help="Test a data source")
     test_p.add_argument("source",
                         help="fred, jin10, jin10-calendar, rss, price, overview")
@@ -242,6 +320,8 @@ def main():
         "health": cmd_health,
         "maintain": cmd_maintain,
         "material": cmd_material,
+        "select": cmd_select,
+        "refine": cmd_refine,
         "test": cmd_test_source,
     }
     commands[args.command](args)

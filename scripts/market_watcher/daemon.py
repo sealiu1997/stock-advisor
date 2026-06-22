@@ -339,6 +339,17 @@ def run_scan_cycle(config: dict) -> dict:
         except Exception as e:
             logger.warning(f"PKS maintenance failed: {e}")
 
+    # Daily selection: promote top material to PKS (runs once per day)
+    last_select = state.get("last_scan", {}).get("_time_selection", 0)
+    if now - last_select > 43200:  # every 12h
+        try:
+            from .selector import run_daily_selection
+            report = run_daily_selection(material)
+            logger.info(f"Daily selection: {report}")
+            state.setdefault("last_scan", {})["_time_selection"] = now
+        except Exception as e:
+            logger.warning(f"Daily selection failed: {e}")
+
     # Daily material cleanup (keep 7 days)
     last_cleanup = state.get("last_scan", {}).get("_time_cleanup", 0)
     if now - last_cleanup > 86400:

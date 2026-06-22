@@ -6,6 +6,11 @@
 > - B1 两层架构 (MaterialStore + daemon 重构): ✅
 > - B7 稳定去重 (sha256 stable_id): ✅
 > - B4 Price signal 类型修正 (overview 写 material 不写 PKS): ✅
+>
+> **Phase 2 状态: ✅ 已完成** (2026-06-22)
+> - B2 Daily selector (评分 + facts≤20/inferences≤5 + 自动 promote to PKS): ✅
+> - B3 Calendar 两阶段 (scheduled→actual supersede): ✅
+> - B5 Inference 两层筛选 (规则初筛 + agent_refine 精选接口): ✅
 
 ---
 
