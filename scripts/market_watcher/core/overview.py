@@ -204,7 +204,12 @@ def run_overview(price_data: dict[str, tuple[float, float]]) -> list[dict]:
 
 
 def write_signals_to_pks(signals: list[dict]):
-    """Write overview signals to PKS."""
+    """Legacy: write overview signals to PKS.
+
+    In the two-layer architecture, overview signals go to daily material
+    first (handled by daemon.py). This function is kept for backward
+    compatibility but should not be called in normal flow.
+    """
     for sig in signals:
         pks.write_market_signal(
             signal_type=sig["type"],

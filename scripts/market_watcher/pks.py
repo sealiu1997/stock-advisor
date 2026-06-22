@@ -1,9 +1,14 @@
-"""PKS integration — uses Python API directly (PKS installed locally)."""
+"""PKS integration — uses Python API directly (PKS installed locally).
+
+In the two-layer architecture, raw news does NOT go through this module.
+Only the daily selector calls write functions here to promote selected
+facts and inferences into durable PKS claims.
+"""
 
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 logger = logging.getLogger("market_watcher.pks")
@@ -35,11 +40,13 @@ def add_claim(
     source_ref: str = "market_watcher",
     excerpt: str = "",
     content: str = "",
+    metadata: dict[str, Any] | None = None,
+    valid_until: date | None = None,
 ) -> str | None:
     """Add a new claim to PKS. Returns claim_id or None on failure."""
     kernel = _get_kernel()
     try:
-        claim_data = {
+        claim_data: dict[str, Any] = {
             "subject": subject,
             "predicate": predicate,
             "object": obj,
@@ -56,6 +63,10 @@ def add_claim(
                 }
             ],
         }
+        if metadata:
+            claim_data["metadata"] = metadata
+        if valid_until:
+            claim_data["valid_until"] = valid_until.isoformat()
         claim = kernel.build_candidate_claim(PROJECT_ID, claim_data)
         decision = kernel.submit_candidate(PROJECT_ID, claim)
         if decision.action.value == "auto_accept":
@@ -74,7 +85,6 @@ def list_claims(
     subject: str | None = None,
     predicate: str | None = None,
 ) -> list:
-    """Query claims from PKS. Returns list of Claim objects."""
     kernel = _get_kernel()
     try:
         return kernel.list_claims(
@@ -119,7 +129,6 @@ def supersede_claim(
     confidence: float = 1.0,
     tags: list[str] | None = None,
 ) -> str | None:
-    """Replace an old claim with a new one. Returns new claim_id."""
     kernel = _get_kernel()
     try:
         old = kernel.load_claim(PROJECT_ID, old_claim_id)
@@ -151,7 +160,6 @@ def supersede_claim(
 
 
 def health_check() -> dict:
-    """Run health check on market-context capsule."""
     kernel = _get_kernel()
     try:
         report = kernel.health_check(PROJECT_ID)
@@ -162,7 +170,6 @@ def health_check() -> dict:
 
 
 def run_maintenance() -> dict:
-    """Run maintenance (stale scan, expiry enforcement, evidence check)."""
     kernel = _get_kernel()
     try:
         report = kernel.maintenance.run_all(PROJECT_ID, today=_today())
@@ -178,7 +185,6 @@ def run_maintenance() -> dict:
 
 
 def render_context() -> str:
-    """Render full market context for briefing consumption."""
     kernel = _get_kernel()
     try:
         return kernel.render_context(PROJECT_ID)
@@ -187,12 +193,70 @@ def render_context() -> str:
         return ""
 
 
-# --- High-level helpers for market_watcher ---
+# --- High-level helpers for selected claims (Layer 2) ---
+
+def write_selected_fact(
+    subject: str,
+    predicate: str,
+    obj: str,
+    *,
+    tags: list[str] | None = None,
+    source_ref: str = "market_watcher/selector",
+    excerpt: str = "",
+    content: str = "",
+    metadata: dict[str, Any] | None = None,
+    valid_until: date | None = None,
+) -> str | None:
+    """Write a daily-selected factual claim to PKS."""
+    return add_claim(
+        subject=subject,
+        predicate=predicate,
+        obj=obj,
+        claim_type="factual",
+        confidence=1.0,
+        tags=tags or [],
+        source_ref=source_ref,
+        excerpt=excerpt,
+        content=content,
+        metadata=metadata,
+        valid_until=valid_until,
+    )
+
+
+def write_selected_inference(
+    subject: str,
+    predicate: str,
+    obj: str,
+    *,
+    confidence: float = 0.8,
+    tags: list[str] | None = None,
+    source_ref: str = "market_watcher/selector",
+    excerpt: str = "",
+    content: str = "",
+    metadata: dict[str, Any] | None = None,
+    valid_until: date | None = None,
+) -> str | None:
+    """Write a daily-selected inference claim to PKS."""
+    return add_claim(
+        subject=subject,
+        predicate=predicate,
+        obj=obj,
+        claim_type="inference",
+        confidence=confidence,
+        tags=["narrative"] + (tags or []),
+        source_ref=source_ref,
+        excerpt=excerpt,
+        content=content,
+        metadata=metadata,
+        valid_until=valid_until,
+    )
+
+
+# --- Legacy helpers (kept for backward compat / CLI test commands) ---
 
 def write_data_point(subject: str, predicate: str, value: str,
                      period: str, source_ref: str = "market_watcher",
                      tags: list[str] | None = None) -> str | None:
-    """Write an L0 factual data point (e.g. CPI reading)."""
     return add_claim(
         subject=subject,
         predicate=predicate,
@@ -208,7 +272,6 @@ def write_data_point(subject: str, predicate: str, value: str,
 
 def write_price_signal(symbol: str, change: str, current: float,
                        severity: str) -> str | None:
-    """Write a price anomaly signal."""
     label = symbol.lower().replace("^", "").replace("=f", "")
     return add_claim(
         subject=label,
@@ -216,7 +279,7 @@ def write_price_signal(symbol: str, change: str, current: float,
         obj=f"{change} (current: {current})",
         claim_type="factual",
         confidence=1.0,
-        tags=["price", severity],
+        tags=["price", "intraday", severity],
         source_ref="yfinance",
         excerpt=f"{symbol} moved {change} to {current}",
     )
@@ -224,7 +287,6 @@ def write_price_signal(symbol: str, change: str, current: float,
 
 def write_news_item(source_label: str, title: str, tier: int,
                     tags: list[str] | None = None) -> str | None:
-    """Write a news item as factual claim."""
     return add_claim(
         subject="news",
         predicate="headline",
@@ -240,7 +302,6 @@ def write_news_item(source_label: str, title: str, tier: int,
 def write_market_signal(signal_type: str, description: str,
                         confidence: float = 0.8,
                         tags: list[str] | None = None) -> str | None:
-    """Write an L1 market signal / narrative inference."""
     return add_claim(
         subject="market_signal",
         predicate=signal_type,
@@ -255,39 +316,33 @@ def write_market_signal(signal_type: str, description: str,
 
 def write_calendar_event(event_name: str, event_date: str,
                          details: str = "") -> str | None:
-    """Write an upcoming economic event."""
     return add_claim(
         subject="calendar",
         predicate="upcoming_event",
         obj=f"{event_name} on {event_date}",
         claim_type="factual",
         confidence=1.0,
-        tags=["calendar", "event"],
+        tags=["calendar", "scheduled"],
         source_ref="jin10/calendar",
         excerpt=details or f"{event_name} scheduled for {event_date}",
     )
 
 
 def get_active_narratives() -> list:
-    """Get all active market narratives."""
     return list_claims(tag="narrative", predicate="active_theme")
 
 
 def get_recent_signals() -> list:
-    """Get recent market signals."""
     return list_claims(tag="signal")
 
 
 def get_recent_data() -> list:
-    """Get recent data points."""
     return list_claims(tag="data")
 
 
 def get_recent_news() -> list:
-    """Get recent news items."""
     return list_claims(tag="news")
 
 
 def get_calendar_events() -> list:
-    """Get upcoming calendar events."""
     return list_claims(subject="calendar")

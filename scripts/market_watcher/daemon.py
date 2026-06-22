@@ -1,28 +1,29 @@
 """Main scheduling loop for market_watcher daemon.
 
-This is the heart of the information management system:
-1. Collect data from all sources
-2. Score impact
-3. Run market overview assessment
-4. Run theme analysis + narrative management
-5. Write to PKS
-6. Notify on critical/high events
+Two-layer architecture:
+1. Collect → Score → Write to daily material (Layer 1)
+2. Overview/Theme analysis on material
+3. Notify on critical/high events
+4. Daily selector promotes top facts/inferences to PKS (Layer 2)
 """
 
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any
 
 from . import pks, scorer, trigger
 from .core import analyzer, calendar, overview
+from .material import MaterialStore, stable_id
 from .sources import fred, jin10, rss, price
 
 logger = logging.getLogger("market_watcher")
 
 STATE_FILE = Path("data/watcher_state.json")
+
+material = MaterialStore()
+
 
 def _extract_jin10_items(data) -> list:
     if not data:
@@ -65,7 +66,7 @@ def load_state() -> dict:
     if STATE_FILE.exists():
         with open(STATE_FILE) as f:
             return json.load(f)
-    return {"last_scan": {}, "seen_guids": []}
+    return {"last_scan": {}, "seen_ids": {}}
 
 
 def save_state(state: dict):
@@ -91,21 +92,27 @@ def is_market_hours(config: dict) -> bool:
     return start <= now.hour < end
 
 
-# --- Source Scanners ---
+# --- Source Scanners (write to material, not PKS) ---
 
 def scan_fred(config: dict, state: dict) -> list[dict]:
     events = []
     api_key = config["fred"]["api_key"]
+    material_items = []
     for label, series_id in config["fred"]["series"].items():
         last_date = state.get("last_scan", {}).get(f"fred_{series_id}")
         obs = fred.check_for_new_release(series_id, api_key, last_date)
         if obs:
             obs["label"] = label
+            obs["_id"] = stable_id("fred", series_id, obs.get("date", ""))
             level = scorer.score_event("fred", obs, config)
+            obs["_level"] = level
+            material_items.append(obs)
             if scorer.should_store(level):
-                calendar.write_fred_release_to_pks(obs)
                 events.append(trigger.format_event("fred", obs, level))
             state.setdefault("last_scan", {})[f"fred_{series_id}"] = obs["date"]
+
+    if material_items:
+        material.append("fred", material_items)
     return events
 
 
@@ -117,36 +124,52 @@ def scan_jin10(config: dict, state: dict) -> list[dict]:
         logger.warning(f"Jin10 client init failed: {e}")
         return []
 
-    # Flash news
+    # Flash news → material
     try:
         data = client.list_flash()
         items = _extract_jin10_items(data)
-        seen = set(state.get("seen_guids", []))
+        seen = state.get("seen_ids", {}).get("jin10", {})
 
+        material_items = []
         for item in (items or []):
-            guid = str(item.get("url") or item.get("id") or item.get("remark_id") or hash(str(item)))
-            if guid in seen:
+            content = item.get("content") or item.get("title") or ""
+            sid = stable_id("jin10", content[:100], str(item.get("url", "")))
+            if sid in seen:
                 continue
-            seen.add(guid)
+            seen[sid] = datetime.now().isoformat()
+
             level = scorer.score_event("jin10_flash", item, config)
+            item["_id"] = sid
+            item["_level"] = level
+            material_items.append(item)
+
             if scorer.should_store(level):
-                content = item.get("content") or item.get("title") or ""
-                pks.write_news_item(
-                    source_label="jin10",
-                    title=content[:200],
-                    tier=1 if level in ("critical", "high") else 2,
-                    tags=["jin10", level],
-                )
                 events.append(trigger.format_event("jin10_flash", item, level))
 
-        state["seen_guids"] = list(seen)[-500:]
+        if material_items:
+            material.append("jin10", material_items)
+
+        # Trim seen cache
+        if len(seen) > 2000:
+            sorted_ids = sorted(seen.items(), key=lambda x: x[1], reverse=True)
+            seen = dict(sorted_ids[:1000])
+        state.setdefault("seen_ids", {})["jin10"] = seen
     except Exception as e:
         logger.warning(f"Jin10 flash scan failed: {e}")
 
-    # Calendar
+    # Calendar → material
     try:
         cal_events = calendar.scan_upcoming_events(client)
-        calendar.write_events_to_pks(cal_events)
+        if cal_events:
+            cal_items = []
+            for ev in cal_events:
+                ev["_id"] = stable_id(
+                    "calendar",
+                    ev.get("title", ""),
+                    ev.get("pub_time", ""),
+                )
+                cal_items.append(ev)
+            material.append("calendar", cal_items)
     except Exception as e:
         logger.warning(f"Jin10 calendar scan failed: {e}")
 
@@ -157,24 +180,32 @@ def scan_rss(config: dict, state: dict) -> list[dict]:
     events = []
     feeds = config.get("rss_feeds", config.get("rss", {}).get("feeds", []))
     items = rss.scan_feeds(feeds)
-    seen = set(state.get("seen_guids", []))
+    seen = state.get("seen_ids", {}).get("rss", {})
 
+    material_items = []
     for item in items:
-        guid = item.get("guid", "")
-        if guid in seen:
+        title = item.get("title", "")
+        link = item.get("link", "")
+        sid = stable_id("rss", title, link)
+        if sid in seen:
             continue
-        seen.add(guid)
+        seen[sid] = datetime.now().isoformat()
+
         level = scorer.score_event("rss", item, config)
+        item["_id"] = sid
+        item["_level"] = level
+        material_items.append(item)
+
         if scorer.should_store(level):
-            pks.write_news_item(
-                source_label=item.get("source_label", "rss"),
-                title=item.get("title", "")[:200],
-                tier=item.get("source_tier", 3),
-                tags=[level],
-            )
             events.append(trigger.format_event("rss", item, level))
 
-    state["seen_guids"] = list(seen)[-500:]
+    if material_items:
+        material.append("rss", material_items)
+
+    if len(seen) > 2000:
+        sorted_ids = sorted(seen.items(), key=lambda x: x[1], reverse=True)
+        seen = dict(sorted_ids[:1000])
+    state.setdefault("seen_ids", {})["rss"] = seen
     return events
 
 
@@ -192,13 +223,28 @@ def scan_prices(config: dict, state: dict) -> tuple[list[dict], dict]:
         return [], {}
 
     price_data = {}
+    price_items = []
     for yf_sym, label in SYMBOL_MAP.items():
         try:
             closes = data[yf_sym]["Close"].dropna()
             if len(closes) >= 2:
-                price_data[label] = (float(closes.iloc[-1]), float(closes.iloc[-2]))
+                current = float(closes.iloc[-1])
+                previous = float(closes.iloc[-2])
+                price_data[label] = (current, previous)
+                pct = (current - previous) / previous * 100
+                price_items.append({
+                    "_id": stable_id("price", label, date.today().isoformat()),
+                    "symbol": yf_sym,
+                    "label": label,
+                    "current": current,
+                    "previous": previous,
+                    "change_pct": round(pct, 2),
+                })
         except (KeyError, IndexError):
             continue
+
+    if price_items:
+        material.append("prices", price_items)
 
     thresholds = config.get("price_alert_thresholds", config.get("price_alerts", {}).get("thresholds", {}))
     anomalies = price.check_anomalies(thresholds)
@@ -206,12 +252,6 @@ def scan_prices(config: dict, state: dict) -> tuple[list[dict], dict]:
     for a in anomalies:
         level = scorer.score_event("price", a, config)
         if scorer.should_store(level):
-            pks.write_price_signal(
-                symbol=a["symbol"],
-                change=a["change"],
-                current=a["current"],
-                severity=level,
-            )
             events.append(trigger.format_event("price", a, level))
 
     return events, price_data
@@ -220,7 +260,7 @@ def scan_prices(config: dict, state: dict) -> tuple[list[dict], dict]:
 # --- Main Cycle ---
 
 def run_scan_cycle(config: dict) -> dict:
-    """Run one full scan cycle: collect → score → analyze → write PKS → notify."""
+    """Run one full scan cycle: collect → score → write material → analyze → notify."""
     state = load_state()
     all_events = []
     errors = []
@@ -260,17 +300,27 @@ def run_scan_cycle(config: dict) -> dict:
             logger.error(f"Error scanning {source_name}: {e}")
             errors.append({"source": source_name, "error": str(e)})
 
-    # Run market overview if we got price data
+    # Run market overview → material (not PKS)
     overview_signals = []
     if price_data:
         try:
             overview_signals = overview.run_overview(price_data)
-            overview.write_signals_to_pks(overview_signals)
+            if overview_signals:
+                overview_items = []
+                for sig in overview_signals:
+                    sig["_id"] = stable_id(
+                        "overview",
+                        sig.get("type", ""),
+                        date.today().isoformat(),
+                    )
+                    sig["_type"] = "factual"
+                    overview_items.append(sig)
+                material.append("overview", overview_items)
         except Exception as e:
             logger.error(f"Overview assessment failed: {e}")
             errors.append({"source": "overview", "error": str(e)})
 
-    # Run theme analysis on collected events + signals
+    # Run theme analysis on collected events + signals → material
     themes = []
     if all_events or overview_signals:
         try:
@@ -279,7 +329,7 @@ def run_scan_cycle(config: dict) -> dict:
             logger.error(f"Theme analysis failed: {e}")
             errors.append({"source": "analyzer", "error": str(e)})
 
-    # Run PKS maintenance periodically (every ~6 hours)
+    # PKS maintenance periodically (every ~6 hours)
     last_maint = state.get("last_scan", {}).get("_time_maintenance", 0)
     if now - last_maint > 21600:
         try:
@@ -288,6 +338,15 @@ def run_scan_cycle(config: dict) -> dict:
             state.setdefault("last_scan", {})["_time_maintenance"] = now
         except Exception as e:
             logger.warning(f"PKS maintenance failed: {e}")
+
+    # Daily material cleanup (keep 7 days)
+    last_cleanup = state.get("last_scan", {}).get("_time_cleanup", 0)
+    if now - last_cleanup > 86400:
+        try:
+            material.cleanup(keep_days=7)
+            state.setdefault("last_scan", {})["_time_cleanup"] = now
+        except Exception as e:
+            logger.warning(f"Material cleanup failed: {e}")
 
     save_state(state)
 
@@ -319,6 +378,7 @@ def run_daemon(config_path: str = "config/watcher.json"):
 
     logger.info(f"Market watcher starting. Loop interval: {loop_sleep}s")
     logger.info(f"PKS project: {pks.PROJECT_ID}")
+    logger.info(f"Material dir: {material.base_dir}")
 
     while True:
         try:

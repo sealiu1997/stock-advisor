@@ -104,7 +104,7 @@ def check_fred_releases(fred_results: list[dict], state: dict) -> list[dict]:
 
 
 def write_events_to_pks(events: list[dict]):
-    """Write calendar events to PKS."""
+    """Legacy: write calendar events to PKS. Kept for backward compat / manual use."""
     written = 0
     for event in events:
         if not event.get("high_impact"):
@@ -127,7 +127,7 @@ def write_events_to_pks(events: list[dict]):
 
 
 def write_fred_release_to_pks(obs: dict):
-    """Write a new FRED data release to PKS as factual claim."""
+    """Legacy: write FRED release to PKS. Kept for backward compat / manual use."""
     label = obs.get("label", obs.get("series_id", "unknown"))
     pks.write_data_point(
         subject=label,

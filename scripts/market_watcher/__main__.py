@@ -46,8 +46,11 @@ def cmd_status(args):
             from datetime import datetime
             t = datetime.fromtimestamp(v).strftime("%Y-%m-%d %H:%M:%S")
             print(f"  {k[6:]:20s} {t}")
-    seen = state.get("seen_guids", [])
-    print(f"\nTracked items: {len(seen)}")
+    seen_ids = state.get("seen_ids", {})
+    total_seen = sum(len(v) for v in seen_ids.values()) if isinstance(seen_ids, dict) else 0
+    print(f"\nTracked IDs: {total_seen}")
+    for source, ids in seen_ids.items():
+        print(f"  {source:15s} {len(ids)}")
 
 
 def cmd_context(args):
@@ -90,6 +93,24 @@ def cmd_maintain(args):
         print("Maintenance failed.")
         return
     print(json.dumps(result, indent=2))
+
+
+def cmd_material(args):
+    from .material import MaterialStore
+    store = MaterialStore()
+    dates = store.list_dates()
+    if not dates:
+        print("No material stored yet.")
+        return
+    from datetime import date
+    today = date.today()
+    print(f"Material dates: {len(dates)} (keeping 7 days)")
+    for d in dates[-7:]:
+        stats = store.day_stats(d)
+        marker = " ← today" if d == today else ""
+        total = sum(stats.values())
+        detail = ", ".join(f"{k}:{v}" for k, v in stats.items())
+        print(f"  {d.isoformat()}  {total:>4d} items  ({detail}){marker}")
 
 
 def cmd_test_source(args):
@@ -201,6 +222,8 @@ def main():
     sub.add_parser("health", help="PKS health check")
     sub.add_parser("maintain", help="Run PKS maintenance")
 
+    sub.add_parser("material", help="Show today's raw material stats")
+
     test_p = sub.add_parser("test", help="Test a data source")
     test_p.add_argument("source",
                         help="fred, jin10, jin10-calendar, rss, price, overview")
@@ -218,6 +241,7 @@ def main():
         "narratives": cmd_narratives,
         "health": cmd_health,
         "maintain": cmd_maintain,
+        "material": cmd_material,
         "test": cmd_test_source,
     }
     commands[args.command](args)
